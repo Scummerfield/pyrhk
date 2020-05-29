@@ -184,6 +184,10 @@ class RHK:
                 object = self.load_lowpass_filter0_info()
             elif id == 31: # Low-pass Filter1 Info
                 object = self.load_lowpass_filter1_info()
+            elif id == 32 : # load internal piezo modulation info_count
+                object = self.load_piezo_modulation_info()
+            elif id == 33:
+                object = self.load_pll2_info()
             else:
                 object = []
         else:
@@ -650,7 +654,8 @@ class RHK:
         'peak_amplitude_unit',
         'drive_amplitude_unit',
         'signal_to_drive_ratio_unit',
-        'q_factor_unit'
+        'q_factor_unit',
+        'peak_3db_width_unit'
         ]
 
         for string in string_array:
@@ -710,7 +715,13 @@ class RHK:
         'PLL_PI_gain_unit',
         'diss_PI_gain_unit',
         'diss_PI_ICF_unit',
-        'diss_PI_ouput_unit'
+        'diss_PI_ouput_unit',
+        'diss_pll_PI_setpoint_unit',
+        'lockin_filter_roll_off',
+        'drive_amplitude_control',
+        'pll_lockguard_status',
+        'lockin_cut_off_frequency_unit',
+        'lockin_time_constant_unit'
         ]
 
         for string in string_array:
@@ -863,11 +874,37 @@ class RHK:
 
         return filter_info
 
+    # 32. Internal Piezo modulation info
+    def load_piezo_modulation_info(self):
+
+        MI = dict()
+
+        MI['string_count'] = self.readb(4)
+        MI['non_master_oscillator'] = self.readb(4)
+        MI['amplitude'] = self.readf(8)
+        MI['harmonic_factor'] = self.readf(8)
+        MI['frequency'] = self.readf(8)
+        MI['phase_offset'] = self.readf(8)
+
+        MI['amplitude_unit'] = self.reads(2)
+        MI['freq_unit'] = self.reads(2)
+        MI['phase_unit'] = self.reads(2)
+
+        return MI
+
+    # 33. load pll2 info_count
+    def load_pll2_info(self):
+
+        pll_info = self.load_pll_info()
+
+        return pll_info
+
+
     # class methods *****************************
 
     # utility functions for reading bytes into values and strings
 
-    def readb(self,nBytes): # read value from variable number of bytes
+    def readb(self,nBytes): # read value from variable number of bytes //   carry on here!!!    
 
         value = RHK.parseb([val for val in self.raw_data[self.offset:self.offset+nBytes]])
 
@@ -952,6 +989,8 @@ class object_type(Enum):
     aux_pi_info                 = 29
     low_pass_filter0_info       = 30
     low_pass_filter1_info       = 31
+    piezo_modulation_info       = 32
+    pll2_info                   = 33
 
 class page_data_type(Enum):
 
