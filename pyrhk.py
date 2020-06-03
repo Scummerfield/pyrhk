@@ -16,9 +16,8 @@ class RHK:
     def __init__(self,filename): # initialisation method
 
         self.fid = open(filename,"rb") # open the file in read module
-        self.raw_data = bytearray(self.fid.read()) # read all bytes from file
-        self.fid.close() # close the file
         self.offset = 0 # setting the offset counter to 0
+        self.fid.seek(self.offset) # setting the read offset to 0
 
         self.header = self.read_file_header() # read in the file header
         self.page_index_header = self.get_object(self.header['object_list'][0]) # get the page index header
@@ -58,7 +57,7 @@ class RHK:
 
             self.pages.append(page) # append the page to the array
 
-        self.raw_data = [] # empty the raw_data array to save memory
+        self.fid.close() # close the file
 
     # Class methods for extracting metadata
 
@@ -904,9 +903,11 @@ class RHK:
 
     # utility functions for reading bytes into values and strings
 
-    def readb(self,nBytes): # read value from variable number of bytes //   carry on here!!!    
+    def readb(self,nBytes): # read value from variable number of bytes
 
-        value = RHK.parseb([val for val in self.raw_data[self.offset:self.offset+nBytes]])
+        self.fid.seek(self.offset)
+
+        value = RHK.parseb([val for val in self.fid.read(nBytes)])
 
         self.offset += nBytes # advancing the offset counter
 
@@ -920,10 +921,11 @@ class RHK:
 
     def readf(self,nBytes): # read float value
 
+
         if nBytes == 4: # single precision float
-            value = struct.unpack('f',self.raw_data[self.offset:self.offset+nBytes])[0] # returns as 1 element list so use first element as value
+            value = struct.unpack('f',self.fid.read(nBytes))[0] # returns as 1 element list so use first element as value
         elif nBytes == 8: # i.e. double precision float
-            value = struct.unpack('d',self.raw_data[self.offset:self.offset+nBytes])[0] # returns as 1 element list so use first element as value
+            value = struct.unpack('d',self.fid.read(nBytes))[0] # returns as 1 element list so use first element as value
         else:
             value = 0.0
 
@@ -933,7 +935,7 @@ class RHK:
 
     def readc(self,nBytes):
 
-        character = chr(self.readb(self.raw_data,idx,nBytes))
+        character = chr(self.readb(nBytes))
         self.offset += nBytes  # advancing the offset counter
 
         return character
