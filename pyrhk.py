@@ -13,23 +13,75 @@ import struct
 
 class RHK:
 
-    def __init__(self,filename): # initialisation method
+    def __init__(self,filename,loadtype = "full"): # initialisation method
 
-        self.fid = open(filename,"rb") # open the file in read module
+        self.filename = filename # save the filename as a variable for re-opening loading etc.
+        self.openFile() # open the file in read module
+
         self.offset = 0 # setting the offset counter to 0
         self.fid.seek(self.offset) # setting the read offset to 0
 
+         # boolean indicators to determine what parts of the file have been loaded into the rhk object to allow metadata-only loading
+
+        self.headerLoaded = False # file header
+        self.metaLoaded = False # metadata for all pages
+        self.thumbsLoaded = False # thumbnails loaded
+        self.pagesLoaded = False # full page data loaded
+
+        # reading in the header data and page indexes for the file
+
         self.header = self.read_file_header() # read in the file header
+
+        # get page index and data for where to find metadata and pages
+
         self.page_index_header = self.get_object(self.header['object_list'][0]) # get the page index header
         self.page_index = self.get_page_index()
-        self.pages = [] # empty container for each page
+        self.pages = [] # empty list for each page
+
+        self.headerLoaded = True
+
+        self.closeFile() # close the file once finished loading in the header data
+
+
+
+        # loading the rest of the file depending on init parameter 'meta or full'
+
+        if loadtype == "meta": # loads only the metadata and thumbnails
+
+            self.load_pages(loadData = False) # perform routine to load the metadata and skip page data
+
+            self.thumbsLoaded = True
+            self.metaLoaded = True
+
+        elif loadtype == "full": # load the whole file metadata, thumbnails and page data
+
+            self.load_pages(loadData = True) # load the metadata and the pages
+
+            # updating instance variables
+
+            self.thumbsLoaded = True
+            self.metaLoaded = True
+            self.pagesLoaded = True
+
+        else:
+            pass # do nothing and just load the file headers
+
+
+    def closeFile(self): # method for closing the file once done with loading
+        self.fid.close()
+
+    def openFile(self):
+        self.fid = open(self.filename,'rb') # open the file and set correct fid for further reading
+
+    def load_pages(self,loadData = True): # by default load all the page data as well as the metadata
+
+        self.openFile() # open the file for loading - if the meta has been previously loaded then allows reopening of the file
 
         for i in range(self.header['total_page_count']): # for each page
 
             page = dict() # empty dict for the page
             thumbnail_exists = False # flag for checking if there is a thumnail
-
-            index = self.page_index[i] # get the index listing for the current page
+            index = self.page_index[i] # get the index listing for the current page in order to load the page data
 
             page['header'] = self.get_object(index['object_list'][0],data_type = index['page_data_type'])
 
@@ -37,8 +89,11 @@ class RHK:
 
             for listing in index['object_list']:
                 if listing['object_ID'] == 4: # page data
-                    page['data'] = self.get_object(listing,params = page['header']['params'],data_type = index['page_data_type'])
-                elif listing['object_ID'] == 16: # thumbnail Header
+                    if loadData == True: # only load if loadData is True
+                        page['data'] = self.get_object(listing,params = page['header']['params'],data_type = index['page_data_type'])
+                    else:
+                        page['data'] = []
+                elif listing['object_ID'] == 16: # thumbnail Header to load thumbnail
                     page['thumbnail_header'] = self.get_object(listing)
                 else:
                     pass
@@ -50,17 +105,38 @@ class RHK:
                         # rescale thumnail data
                         thumbnail_exists = True # set thumbnail exists flag to True
 
-            if not thumbnail_exists: # if there is no thumnail data then generate it from the page data
-                page['thumbnail'] = page['data'] # use the page data to generate thumbnail as it's low res
+            if not thumbnail_exists: # if there is no thumbnail data then generate it from the page data
+                page['thumbnail'] = self.get_object(listing,params = page['header']['params'],data_type = index['page_data_type']) # use the page data to generate thumbnail as it's low res
                 thumbnail_exists = True
 
+            self.pages.append(page) # append the page to the page array
 
-            self.pages.append(page) # append the page to the array
+        self.closeFile()
 
-        self.fid.close() # close the file
+
+    def load_page(self,pageNo): # load data from a single page into memory
+
+
+        if self.pagesLoaded:
+            print('All pages have already been loaded!')
+        else:
+
+            self.openFile() # open the file for loading - if the meta has been previously loaded then allows reopening of the file later on
+
+            index = self.page_index[pageNo] # get the index listing for the current page in order to load the page data
+            
+            # load the page data from the page index list
+
+            for listing in index['object_list']:
+                if listing['object_ID'] == 4: # page data
+                    self.pages[pageNo]['data'] = self.get_object(listing,params = self.pages[pageNo]['header']['params'],data_type = index['page_data_type'])
+                else:
+                    pass
+
+            self.closeFile()
+
 
     # Class methods for extracting metadata
-
 
     def read_file_header(self): # reading in the file header
 
